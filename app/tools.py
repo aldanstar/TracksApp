@@ -3,15 +3,51 @@
 import os
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 
 class tools: #набор статических функций для расчета
+
     @staticmethod
-    def img_by_name(name, progress=None):
-        return os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), './images',name+'.png'))
+    def processing(path_to_file, project, separator_net, segmentation_net, counter_net):
+        '''Процедура обработки изображений'''
+        # Ищем похожие файлы
+        files=tools.findSame(path_to_file)
+
+        # Определение типа изображений
+        backlight_path, through_path = separator_net.predict(files)
+
+        through = tools.rgb_read(through_path)
+        backlight = tools.rgb_read(backlight_path)
+
+        # Поиск общей части из названий изображений для наименования образца в проекте
+        name = tools.commonString(os.path.basename(files[0]),os.path.basename(files[1]))
+
+        if name not in project.get_samples_names():
+            project.samples.add_item(name,through,backlight)
+            # Семантическая сегментация подгтовленного изображения
+            tools.semantic_segmentation(project, segmentation_net)
+            # Подсчет треков в кластерах
+            tools.counter(project, counter_net)
+
+    @staticmethod
+    def findSame(path):
+        '''Поиск смежного файла на основе имени исходного'''
+        dir = os.path.dirname(path)
+        main_file=os.path.basename(path)
+        main_file_name, main_file_end = main_file.split('.')
+        files = []
+        cut = -1
+        while len(files)<2:
+            cut+=1
+            files = []
+            check = main_file_name[:len(main_file_name)-cut]
+            for filename in sorted(os.listdir(dir)):
+                if check in filename.split('.')[0]:
+                    files.append(os.path.normpath(os.path.join(dir,filename)))
+        return files
 
     @staticmethod
     def commonString(string1, string2):
+        '''Выделение общей части из двух строк'''
         answer = ""
         len1, len2 = len(string1), len(string2)
         for i in range(len1):
@@ -26,22 +62,20 @@ class tools: #набор статических функций для расче
 
     @staticmethod
     def rgb_read(path):
-        img = cv2.imread(path)
-        return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    @staticmethod
-    def rgb_read(path):
+        '''Чтение изображения из файла с переводом из BGR в RGB'''
         img = cv2.imread(path)
         return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     @staticmethod
     def binnary2rgb(img:np.ndarray):
+        '''Создание псевдо-RGB из бинарного одномерного массива'''
         img = np.argmax(img, axis=2)*255
         img = np.concatenate([img[...,None],img[...,None],img[...,None]], axis=2).astype(np.uint8)
         return img
 
     @staticmethod
     def filtBinnary(data, threshold):
+        '''Генерализация бинарного изображения'''
         ret, thresh = cv2.threshold(data, threshold, 1, cv2.THRESH_BINARY)
 
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
@@ -55,12 +89,14 @@ class tools: #набор статических функций для расче
 
     @staticmethod
     def getContours(binimg):
+        '''Получение контуров из бинарного изображения'''
         contours, hierarchy = cv2.findContours(binimg.copy(), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
         contours = sorted(contours, key=lambda ctr: cv2.boundingRect(ctr)[1])
         return contours, hierarchy
 
     @staticmethod
     def calc_params(contour):
+        '''Инструмент вычисления основных параметров выделенного кластера'''
         # координаты описывающего прямоугольника
         x1, y1, w, h = cv2.boundingRect(contour)
         x2, y2 = x1 + w, y1 + h
@@ -74,7 +110,7 @@ class tools: #набор статических функций для расче
         # подготавливаем шаблон слепка дефекта
         frame = np.zeros(((h, w))).astype(np.uint8)
 
-        # заполнение шаблон слепка в пределах контура дефекта (остальное 0)
+        # заполнение шаблон слепка в пределах контура (остальное 0)
         cv2.drawContours(frame, [copy], contourIdx=0, color=(1, 1, 1), thickness=-1)
 
         # подсчет кол-ва 0 и 1 в слепке для вычисления площадей
@@ -123,17 +159,3 @@ class tools: #набор статических функций для расче
             if prediction==0: prediction=1
 
             track.count = np.uint8(prediction)
-
-
-
-
-        # img = nnet.predict(sample.prepared)
-        # img = tools.filtBinnary(img, 0.75)
-        #
-        # img =  tools.binnary2rgb(img)
-        #
-        # gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-        # contours, _ = tools.getContours(gray)
-        # for i, contour in enumerate(contours):
-        #     left, rigth, top, bottom, frame, contour = tools.calc_params(contour)
-        #     sample.tracks.add_item(left, rigth, top, bottom, frame, contour)

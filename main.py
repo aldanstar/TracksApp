@@ -187,21 +187,6 @@ class Application:
         self.mainDialog.BacklightArea.clear()
         self.project = Project('TEMP')
 
-    def findSame(self, path):
-        dir = os.path.dirname(path)
-        main_file=os.path.basename(path)
-        main_file_name, main_file_end = main_file.split('.')
-        files = []
-        cut = -1
-        while len(files)<2:
-            cut+=1
-            files = []
-            check = main_file_name[:len(main_file_name)-cut]
-            for filename in sorted(os.listdir(dir)):
-                if check in filename.split('.')[0]:
-                    files.append(os.path.normpath(os.path.join(dir,filename)))
-
-        return files
 
     def draw_tree(self):
         self.mainDialog.tree_model.clear()
@@ -213,31 +198,13 @@ class Application:
         path_to_file, _ = QFileDialog.getOpenFileName(self.mainDialog, self.app.tr("Load Image"), self.app.tr(u".\example_imgs"), self.app.tr("Images (*.jpg)"))
         # path_to_file, _ = QFileDialog.getOpenFileName(self.mainDialog, self.app.tr("Load Image"), self.app.tr("~/Desktop/"), self.app.tr("Images (*.jpg)"))
 
-        # Ищем похожие файлы
-        files=self.findSame(path_to_file)
-
         # Определяем тип файла на просвет или на подсветку
-        self.define_ligth_type(files)
+        tools.processing(path_to_file, self.project, self.separator, self.segmentation, self.counter)
 
         self.draw_tree()
         self.fill_table()
         self.updete_viewers()
 
-    def define_ligth_type(self, files):
-
-        backlight_path, through_path= self.separator.predict(files)
-
-        through = tools.rgb_read(through_path)
-        backlight = tools.rgb_read(backlight_path)
-
-        name = tools.commonString(os.path.basename(files[0]),os.path.basename(files[1]))
-        if name not in self.project.get_samples_names():
-            self.project.samples.add_item(name,through,backlight)
-
-            # Семантическая сегментация подгтовленного изображения
-            tools.semantic_segmentation(self.project, self.segmentation)
-
-            tools.counter(self.project, self.counter)
 
     def fill_table(self):
 

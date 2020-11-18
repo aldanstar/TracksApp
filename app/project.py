@@ -145,25 +145,28 @@ class Sample(BaseWellElement):
     def set_params(self, name, through, backlight):
         self.name = name
         self.through = through
-        self.backlight=backlight
+        self.backlight = backlight
         self.prepared: np.ndarray = np.array([])
 
         self.tracks: UTrackList = UTrackList()  # список треков образца
         self.combine_calc()
 
-    def normalize(self, arr: np.ndarray) -> np.ndarray:  # нормализация к1 канального изtoolsбражения от 0 до 255
+    def normalize(self, arr: np.ndarray) -> np.ndarray:
+        '''нормализация к1 канального избражения от 0 до 255'''
         arr = np.float16(arr)
         amin = arr.min()
         rng = arr.max() - amin
         return ((arr - amin) * 255 / rng).astype(np.uint8)
 
     def normalize_img(self, arr: np.ndarray) -> np.ndarray:
+        '''нормализация для каждого канала'''
         bands = []
         for i in range(arr.shape[2]):
             bands.append(self.normalize(np.array(arr)[:, :, i]))
         return np.dstack(bands)
 
     def norm_l_extract(self, img: np.ndarray) -> np.ndarray:
+        '''выделение канала светлоты из цветового пространства Lab'''
         if not isinstance(img, np.ndarray):
             img = np.array(img)
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
@@ -175,6 +178,7 @@ class Sample(BaseWellElement):
         return self.normalize(cl)
 
     def mean_bet_imgs(self, img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
+        '''создание дополнительного третьего канала'''
         if not isinstance(img1, np.ndarray):
             img1 = np.array(img1)
             img2 = np.array(img2)
@@ -188,6 +192,7 @@ class Sample(BaseWellElement):
         return self.normalize(img3)
 
     def combine_calc(self):
+        '''основная процедура создания композиции'''
         img3=self.mean_bet_imgs(self.through,self.backlight)
         img1=self.norm_l_extract(self.through)
         img2=self.norm_l_extract(self.backlight)
