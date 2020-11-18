@@ -120,6 +120,7 @@ class tools: #набор статических функций для расче
             img = img[None,...]
 
             prediction = nnet.predict([img, frame])
+            if prediction==0: prediction=1
 
             track.count = np.uint8(prediction)
 

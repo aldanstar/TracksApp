@@ -20,7 +20,7 @@ from gui.viewer import ViewerArea
 from gui.status import work_indicator
 from gui.gui_communication import com_port_dialog
 from gui.additional import about_dialog
-from gui.tree import TreeModel, Node
+from gui.tree import ProjectTreeModel, Node
 
 class main_dialog(QMainWindow):
     def __init__(self, title):
@@ -121,15 +121,20 @@ class main_dialog(QMainWindow):
 
         self.tree = QTreeView()
 
+        self.tree.mouseDoubleClickEvent = self.on_tree_clicked
+
         treeDock = QDockWidget(self.tr(u'Project tree'), self)
         treeDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.addDockWidget(Qt.LeftDockWidgetArea, treeDock)
 
         self.project_tree = QTreeView()
         self.root_node = Node(None)
-        self.tree_model = TreeModel()
+        self.tree_model = ProjectTreeModel()
         self.project_tree.setModel(self.tree_model)
         treeDock.setWidget(self.project_tree)
+
+    def on_tree_clicked(self, event):
+        print(event)
 
 
 
@@ -205,7 +210,7 @@ class Application:
             self.mainDialog.tree_model.appendRow(Node(sample))
 
     def openFile(self):
-        path_to_file, _ = QFileDialog.getOpenFileName(self.mainDialog, self.app.tr("Load Image"), self.app.tr(u"E:\__TRACKS\RAW\AFT"), self.app.tr("Images (*.jpg)"))
+        path_to_file, _ = QFileDialog.getOpenFileName(self.mainDialog, self.app.tr("Load Image"), self.app.tr(u".\example_imgs"), self.app.tr("Images (*.jpg)"))
         # path_to_file, _ = QFileDialog.getOpenFileName(self.mainDialog, self.app.tr("Load Image"), self.app.tr("~/Desktop/"), self.app.tr("Images (*.jpg)"))
 
         # Ищем похожие файлы
@@ -247,7 +252,7 @@ class Application:
         self.mainDialog.table.resizeRowsToContents()
         self.mainDialog.table.resizeColumnsToContents()
 
-        count = sample.tracks.get_count()
+        count = round(np.sum([track.count for track in sample.tracks.get_sorted_by_id()]),2)
         general_area = round(np.sum([track.area for track in sample.tracks.get_sorted_by_id()]),2)
 
         self.mainDialog.infolabel.setText('''

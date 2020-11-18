@@ -1,6 +1,7 @@
 from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex
 
 class Node(object):
+
     def __init__(self, obj, parent=None):
         if obj is not None:
             self._id = obj.id
@@ -57,9 +58,9 @@ class Node(object):
     def __repr__(self):
         return self._name
 
-class TreeModel(QAbstractItemModel):
+class ProjectTreeModel(QAbstractItemModel):
     def __init__(self, parent=None):
-        super(TreeModel, self).__init__(parent)
+        super(ProjectTreeModel, self).__init__(parent)
         self._rootNode = Node(None)
 
     def rowCount(self, parent=QModelIndex()):
@@ -134,7 +135,7 @@ class TreeModel(QAbstractItemModel):
 
     def parent(self, index):
         node = index.internalPointer()
-
+        print(node)
         parentNode = node.parent()
 
         if parentNode == self._rootNode:
@@ -145,7 +146,7 @@ class TreeModel(QAbstractItemModel):
     def flags(self, index):
 
         # Original, inherited flags:
-        original_flags = super(TreeModel, self).flags(index)
+        original_flags = super(ProjectTreeModel, self).flags(index)
 
         return (original_flags | Qt.ItemIsEnabled
                 | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled

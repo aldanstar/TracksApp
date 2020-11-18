@@ -4,11 +4,14 @@ from tensorflow.keras import backend as K
 from res import resources
 import numpy as np
 import cv2
+import joblib
+
 
 class counter:
 
     def __init__(self, ):
         self.model = load_model(resources.CNTNN)
+        self.scaler = joblib.load(resources.SCALER)
 
         self.data_info= {
             'orig_width' : None,
@@ -19,8 +22,13 @@ class counter:
         }
 
     def predict(self, orig_imgs):
-        prediction = self.model.predict(orig_imgs)
-        return np.argmax(prediction)
+        to_pred=[]
+        for img in orig_imgs:
+            img = (img / 127) - 1
+            to_pred.append(img)
+        prediction = self.model.predict(to_pred)
+        original = self.scaler.inverse_transform(prediction)
+        return int(round(float(original[0][0])))
 
 class imgsep:
 
@@ -41,6 +49,7 @@ class imgsep:
             img = image.img_to_array(image.load_img(img, target_size=(self.data_info['img_width'], self.data_info['img_height'])))
             imgs.append(img)
         imgs=np.array(imgs)
+        imgs = (np.array(imgs)/127)-1
         prediction = self.model.predict(imgs)
         predict_list = np.argmax(prediction, axis = 1)
         result = [x for _,x in sorted(zip(predict_list,orig_imgs))]
@@ -67,6 +76,7 @@ class imgsemseg:
         self.data_info['orig_height'] = orig_img.shape[0]
 
         img = cv2.resize(orig_img, (int(self.data_info['img_width']), int(self.data_info['img_height'])))
+        img = (img / 127) - 1
         prediction = self.model.predict(img[None,...])
 
         orig_prediction = []
