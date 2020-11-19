@@ -8,7 +8,7 @@ import joblib
 
 
 class counter:
-
+    '''Класс взаимодействия с НС посчета трков'''
     def __init__(self, ):
         self.model = load_model(resources.CNTNN)
         self.scaler = joblib.load(resources.SCALER)
@@ -31,7 +31,7 @@ class counter:
         return int(round(float(original[0][0])))
 
 class imgsep:
-
+    '''Класс взаимодействия с НС определения типа съемки'''
     def __init__(self, ):
         self.model = load_model(resources.SEPNN)
 
@@ -56,7 +56,7 @@ class imgsep:
         return result
 
 class imgsemseg:
-
+    '''Класс взаимодействия с НС семантической сегментации'''
     def __init__(self):
         self.model = load_model(resources.SEGNN, custom_objects={"dice_coef": self.dice_coef})
 

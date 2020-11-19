@@ -83,7 +83,6 @@ class tools: #набор статических функций для расче
 
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (20, 20))
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-
         return thresh
 
 
@@ -139,7 +138,7 @@ class tools: #набор статических функций для расче
 
     @staticmethod
     def counter(project, nnet):
-        '''Семантическая сегментация подгтовленного изображения'''
+        '''Посдсчет треков на изображении и заполнение проекта'''
         sample = project.current_sample
 
         for track in sample.tracks.get_sorted_by_id():
