@@ -23,10 +23,11 @@ from gui.additional import about_dialog
 from gui.tree import ProjectTreeModel, Node
 
 class main_dialog(QMainWindow):
-    def __init__(self, title):
+    def __init__(self, app, title):
         QMainWindow.__init__(self, parent=None)
         self.setWindowTitle(title)
         self.setMinimumSize(500, 400)
+        self.app = app
         dw=QDesktopWidget()
         self.resize(dw.width()*0.7,dw.height()*0.7)
 
@@ -63,8 +64,6 @@ class main_dialog(QMainWindow):
 
         self.table = QTableView()
 
-
-
         self.statisticsWidget = QWidget()
         layout = QVBoxLayout()
         self.statisticsWidget.setLayout(layout)
@@ -98,8 +97,6 @@ class main_dialog(QMainWindow):
                         ''')
         generalWidgetlayout.addWidget(self.infolabel)
 
-
-
         layout.addWidget(self.table)
         layout.addWidget(self.generalWidget)
 
@@ -117,26 +114,22 @@ class main_dialog(QMainWindow):
 
         self.tabCentralWidget.currentChanged.connect(self.on_tab_changed)
 
-
-
-        self.tree = QTreeView()
-
-        self.tree.mouseDoubleClickEvent = self.on_tree_clicked
-
         treeDock = QDockWidget(self.tr(u'Project tree'), self)
         treeDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.addDockWidget(Qt.LeftDockWidgetArea, treeDock)
 
         self.project_tree = QTreeView()
+        self.project_tree.doubleClicked.connect(self.on_tree_clicked)
         self.root_node = Node(None)
         self.tree_model = ProjectTreeModel()
         self.project_tree.setModel(self.tree_model)
         treeDock.setWidget(self.project_tree)
 
-    def on_tree_clicked(self, event):
-        print(event)
-
-
+    def on_tree_clicked(self, index):
+        item = self.project_tree.selectedIndexes()[0]
+        if self.app.project.current_sample!=item.model().itemFromIndex(index).sample:
+            self.app.project.current_sample = item.model().itemFromIndex(index).sample
+            self.app.refresh()
 
 class Application:
     def __init__(self):
@@ -153,7 +146,7 @@ class Application:
 
         self.project = Project('TEMP')
 
-        self.mainDialog=main_dialog(self.title)
+        self.mainDialog=main_dialog(self, self.title)
         self.mainDialog.show()
         file_menu=menu_item(self.app.tr(u'File'))
 
@@ -190,7 +183,6 @@ class Application:
 
     def draw_tree(self):
         self.mainDialog.tree_model.clear()
-
         for sample in self.project.samples.get_sorted_by_id():
             self.mainDialog.tree_model.appendRow(Node(sample))
 
@@ -200,11 +192,12 @@ class Application:
 
         # Определяем тип файла на просвет или на подсветку
         tools.processing(path_to_file, self.project, self.separator, self.segmentation, self.counter)
+        self.refresh()
 
+    def refresh(self):
         self.draw_tree()
         self.fill_table()
         self.updete_viewers()
-
 
     def fill_table(self):
 

@@ -6,6 +6,7 @@ class Node(object):
         if obj is not None:
             self._id = obj.id
             self._name = obj.name
+            self._sample = obj
         else:
             self._id = None
             self._name = 'Samples'
@@ -14,6 +15,14 @@ class Node(object):
 
         if parent is not None:
             parent.addChild(self)
+
+    @property
+    def sampleid(self):
+        return self._id
+
+    @property
+    def sample(self):
+        return self._sample
 
     def addChild(self, child):
         self._children.append(child)
@@ -132,6 +141,9 @@ class ProjectTreeModel(QAbstractItemModel):
         childItem = parentNode.child(row)
 
         return self.createIndex(row, column, childItem)
+
+    def itemFromIndex(self, index):
+        return index.internalPointer()
 
     def parent(self, index):
         node = index.internalPointer()
