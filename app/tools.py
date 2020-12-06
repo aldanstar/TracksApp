@@ -7,6 +7,48 @@ import numpy as np
 class tools: #набор статических функций для расчета
 
     @staticmethod
+    def normalize(arr: np.ndarray) -> np.ndarray:
+        '''нормализация к1 канального избражения от 0 до 255'''
+        arr = np.float16(arr)
+        amin = arr.min()
+        rng = arr.max() - amin
+        return ((arr - amin) * 255 / rng).astype(np.uint8)
+
+    @staticmethod
+    def normalize_img(arr: np.ndarray) -> np.ndarray:
+        '''нормализация для каждого канала'''
+        bands = []
+        for i in range(arr.shape[2]):
+            bands.append(tools.normalize(np.array(arr)[:, :, i]))
+        return np.dstack(bands)
+
+    @staticmethod
+    def norm_l_extract(img: np.ndarray) -> np.ndarray:
+        '''выделение канала светлоты из цветового пространства Lab'''
+        if not isinstance(img, np.ndarray):
+            img = np.array(img)
+        lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        cl = clahe.apply(l)
+        cl = cv2.equalizeHist(cl)
+        return tools.normalize(cl)
+
+    @staticmethod
+    def mean_bet_imgs(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
+        '''создание дополнительного третьего канала'''
+        if not isinstance(img1, np.ndarray):
+            img1 = np.array(img1)
+            img2 = np.array(img2)
+        img1 = tools.normalize_img(img1)
+        img2 = tools.normalize_img(img2)
+        img3 = np.mean(np.dstack((img1, img2)), axis=2)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        img3 = clahe.apply(tools.normalize(img3))
+        img3 = cv2.equalizeHist(img3)
+        return tools.normalize(img3)
+
+    @staticmethod
     def processing(path_to_file, project, separator_net, segmentation_net, counter_net):
         '''Процедура обработки изображений'''
         # Ищем похожие файлы
@@ -84,7 +126,6 @@ class tools: #набор статических функций для расче
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (20, 20))
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
         return thresh
-
 
     @staticmethod
     def getContours(binimg):

@@ -179,12 +179,6 @@ class Application:
             self.project.current_sample = item.model().itemFromIndex(index).obj
             self.refresh()
 
-    def packObj(self, data: object) -> bytes:
-        return pickle.dumps(data)
-
-    def unpackObj(self, blob: bytes) -> object:
-        return pickle.loads(blob)
-
     def newProject(self):
         self.mainDialog.PreparedArea.clear()
         self.mainDialog.ThroughArea.clear()

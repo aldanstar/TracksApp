@@ -1,7 +1,7 @@
 import numpy as np
-import cv2
 from enum import Enum
 from typing import Dict,List
+from app.tools import tools
 
 # Перечисление типов элементов конструкции
 class ElementType(Enum):
@@ -16,7 +16,7 @@ class ElementType(Enum):
     UTRACK = 5
 
 # Базовый класс элемента конструкции скважины
-class BaseWellElement:
+class BaseProjectElement:
     """ Базовый класс элемента конструкции скважины """
     __slots__ = (
     'type', 'name', 'hint', 'tag', 'number', 'top', 'bottom', 'top_prj', 'bottom_prj', 'id', 'parent', 'root')
@@ -39,7 +39,7 @@ class BaseWellElement:
         self.parent.delete_item(self)
 
 
-class ParentWellElement(BaseWellElement):
+class ParentProjectElement(BaseProjectElement):
     """ Базовый класс элемента конструкции скважины """
     __slots__ = ('__CID__', 'items')
 
@@ -96,8 +96,8 @@ class ParentWellElement(BaseWellElement):
         return items
 
 # класс трека
-class UTrack(BaseWellElement):
-    """ класс параметров дефекта в таблице дефектов  """
+class UTrack(BaseProjectElement):
+    """ класс параметров трека  """
 
     def __init__(self, ID=None, parent=None, root=None, left:int=0, rigth:int=0, top:int=0,bottom:int=0, frame:np.ndarray=np.array([]),contour:np.ndarray=np.array([]), area:float=0):
         super().__init__()
@@ -119,7 +119,7 @@ class UTrack(BaseWellElement):
 
 
 # класс коллекции параметров треков
-class UTrackList(ParentWellElement):
+class UTrackList(ParentProjectElement):
 
     def __init__(self):
         super().__init__()
@@ -132,8 +132,8 @@ class UTrackList(ParentWellElement):
 
 
 # класс образца
-class Sample(BaseWellElement):
-    """ класс параметров дефекта в таблице дефектов  """
+class Sample(BaseProjectElement):
+    """ класс параметров образца  """
 
     def __init__(self, ID=None, parent=None, root=None, name:str='noname',  through:np.ndarray=np.array([]),backlight:np.ndarray=np.array([])):
         super().__init__()
@@ -151,55 +151,16 @@ class Sample(BaseWellElement):
         self.tracks: UTrackList = UTrackList()  # список треков образца
         self.combine_calc()
 
-    def normalize(self, arr: np.ndarray) -> np.ndarray:
-        '''нормализация к1 канального избражения от 0 до 255'''
-        arr = np.float16(arr)
-        amin = arr.min()
-        rng = arr.max() - amin
-        return ((arr - amin) * 255 / rng).astype(np.uint8)
-
-    def normalize_img(self, arr: np.ndarray) -> np.ndarray:
-        '''нормализация для каждого канала'''
-        bands = []
-        for i in range(arr.shape[2]):
-            bands.append(self.normalize(np.array(arr)[:, :, i]))
-        return np.dstack(bands)
-
-    def norm_l_extract(self, img: np.ndarray) -> np.ndarray:
-        '''выделение канала светлоты из цветового пространства Lab'''
-        if not isinstance(img, np.ndarray):
-            img = np.array(img)
-        lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-        l, a, b = cv2.split(lab)
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-        cl = clahe.apply(l)
-        cl = cv2.equalizeHist(cl)
-
-        return self.normalize(cl)
-
-    def mean_bet_imgs(self, img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
-        '''создание дополнительного третьего канала'''
-        if not isinstance(img1, np.ndarray):
-            img1 = np.array(img1)
-            img2 = np.array(img2)
-        img1 = self.normalize_img(img1)
-        img2 = self.normalize_img(img2)
-        img3 = np.mean(np.dstack((img1, img2)), axis=2)
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-        img3 = clahe.apply(self.normalize(img3))
-        img3 = cv2.equalizeHist(img3)
-
-        return self.normalize(img3)
 
     def combine_calc(self):
         '''основная процедура создания композиции'''
-        img3=self.mean_bet_imgs(self.through,self.backlight)
-        img1=self.norm_l_extract(self.through)
-        img2=self.norm_l_extract(self.backlight)
+        img3=tools.mean_bet_imgs(self.through,self.backlight)
+        img1=tools.norm_l_extract(self.through)
+        img2=tools.norm_l_extract(self.backlight)
         self.prepared=np.dstack((img2,img3,img1))
 
 # класс коллекции параметров треков
-class Samples(ParentWellElement):
+class Samples(ParentProjectElement):
 
     def __init__(self, root=None):
         super().__init__()
@@ -215,12 +176,12 @@ class Samples(ParentWellElement):
         return self.items[self.__CID__]
 
 # Класс проекта
-class Project(BaseWellElement):
+class Project(BaseProjectElement):
     __slots__ = ('samples', 'current_sample', 'name')
     """ инициализация """
 
     def __init__(self, name=''):
-        BaseWellElement.__init__(self)
+        BaseProjectElement.__init__(self)
         self.name=name
         self.type = ElementType.PROJECT  # тип элемента
         self.samples: Samples = Samples(self)
