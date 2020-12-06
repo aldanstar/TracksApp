@@ -4,10 +4,11 @@
 #-------------------------------------------------------------------------------
 import sys, os
 import numpy as np
+import pickle
 
 from PySide2.QtWidgets import QApplication, QDesktopWidget, QMainWindow, QTabWidget, QDockWidget, QWidget,QLabel
 from PySide2.QtWidgets import QVBoxLayout
-from PySide2.QtWidgets import QFileDialog, QTableView, QTreeView
+from PySide2.QtWidgets import QFileDialog, QTableView
 from PySide2.QtWidgets import QAction
 from PySide2.QtCore import Qt, QTranslator
 
@@ -20,14 +21,14 @@ from gui.viewer import ViewerArea
 from gui.status import work_indicator
 from gui.gui_communication import com_port_dialog
 from gui.additional import about_dialog
-from gui.tree import ProjectTreeModel, Node
+from gui.tree import ProjectTreeModel, Node, ProjectTree
 
 class main_dialog(QMainWindow):
     def __init__(self, app, title):
         QMainWindow.__init__(self, parent=None)
+        self.app = app
         self.setWindowTitle(title)
         self.setMinimumSize(500, 400)
-        self.app = app
         dw=QDesktopWidget()
         self.resize(dw.width()*0.7,dw.height()*0.7)
 
@@ -64,6 +65,8 @@ class main_dialog(QMainWindow):
 
         self.table = QTableView()
 
+
+
         self.statisticsWidget = QWidget()
         layout = QVBoxLayout()
         self.statisticsWidget.setLayout(layout)
@@ -97,6 +100,8 @@ class main_dialog(QMainWindow):
                         ''')
         generalWidgetlayout.addWidget(self.infolabel)
 
+
+
         layout.addWidget(self.table)
         layout.addWidget(self.generalWidget)
 
@@ -114,22 +119,6 @@ class main_dialog(QMainWindow):
 
         self.tabCentralWidget.currentChanged.connect(self.on_tab_changed)
 
-        treeDock = QDockWidget(self.tr(u'Project tree'), self)
-        treeDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
-        self.addDockWidget(Qt.LeftDockWidgetArea, treeDock)
-
-        self.project_tree = QTreeView()
-        self.project_tree.doubleClicked.connect(self.on_tree_clicked)
-        self.root_node = Node(None)
-        self.tree_model = ProjectTreeModel()
-        self.project_tree.setModel(self.tree_model)
-        treeDock.setWidget(self.project_tree)
-
-    def on_tree_clicked(self, index):
-        item = self.project_tree.selectedIndexes()[0]
-        if self.app.project.current_sample!=item.model().itemFromIndex(index).sample:
-            self.app.project.current_sample = item.model().itemFromIndex(index).sample
-            self.app.refresh()
 
 class Application:
     def __init__(self):
@@ -157,9 +146,9 @@ class Application:
         gen_menu.addChildren(menu_item(u'COM port', self.showCOMport))
 
         file_menu.addChildren(menu_item(u'New', self.newProject),
-                              menu_item(u'Open'),
+                              menu_item(u'Open', self.openProject),
                               menu_item(u'Import...', self.openFile),
-                              menu_item(u'Save'),
+                              menu_item(u'Save', self.saveProject),
                               menu_item(u'Exit', self.app.exit))
 
         pref_menu.addChildren(gen_menu, menu_item(u'Settings'))
@@ -172,19 +161,74 @@ class Application:
         com_indicator=work_indicator(u'COM PORT')
         self.mainDialog.addStatusObj(com_indicator)
 
+        treeDock = QDockWidget(self.mainDialog.tr(u'Project tree'), self.mainDialog)
+        treeDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.mainDialog.addDockWidget(Qt.LeftDockWidgetArea, treeDock)
+
+        self.mainnodes = [Node("Samples"), Node("Other")]
+        self.project_tree = ProjectTree(self, self.mainnodes)
+        self.project_tree.doubleClicked.connect(self.on_tree_clicked)
+        treeDock.setWidget(self.project_tree)
+
+
         sys.exit(self.app.exec_())
+
+    def on_tree_clicked(self, index):
+        item = self.project_tree.selectedIndexes()[0]
+        if self.project.current_sample != item.model().itemFromIndex(index).obj:
+            self.project.current_sample = item.model().itemFromIndex(index).obj
+            self.refresh()
+
+    def packObj(self, data: object) -> bytes:
+        return pickle.dumps(data)
+
+    def unpackObj(self, blob: bytes) -> object:
+        return pickle.loads(blob)
 
     def newProject(self):
         self.mainDialog.PreparedArea.clear()
         self.mainDialog.ThroughArea.clear()
         self.mainDialog.BacklightArea.clear()
+        self.mainnodes = [Node("Samples"), Node("Other")]
+        self.project_tree.setMainNodes(self.mainnodes)
         self.project = Project('TEMP')
+        self.refresh()
+
+    def openProject(self):
+        fileName, _ = QFileDialog.getOpenFileName(self.mainDialog, self.app.tr("Load project"),  ".\\", self.app.tr("Project file (*.tpr)"))
+
+        infile = open(fileName, 'rb')
+        self.project = pickle.load(infile)
+        infile.close()
+
+        self.mainDialog.PreparedArea.clear()
+        self.mainDialog.ThroughArea.clear()
+        self.mainDialog.BacklightArea.clear()
+        self.mainnodes = [Node("Samples"), Node("Other")]
+        self.project_tree.setMainNodes(self.mainnodes)
+        self.refresh()
+
+
+    def saveProject(self):
+        fileName, _  = QFileDialog.getSaveFileName(self.mainDialog,  self.app.tr("Save project"), ".\\", self.app.tr("Project file (*.tpr)"))
+        outfile  = open(fileName, "wb")
+        pickle.dump(self.project, outfile)
+        outfile .close()
 
 
     def draw_tree(self):
-        self.mainDialog.tree_model.clear()
+        target = self.mainnodes[0]
+        children = target.children()
+        samples_in_tree=[]
+
         for sample in self.project.samples.get_sorted_by_id():
-            self.mainDialog.tree_model.appendRow(Node(sample))
+            if len(children)>0:
+                samples_in_tree = [node.obj for node in children]
+            if sample not in samples_in_tree:
+                target.addChild(Node(sample))
+
+        self.project_tree.refresh()
+
 
     def openFile(self):
         path_to_file, _ = QFileDialog.getOpenFileName(self.mainDialog, self.app.tr("Load Image"), self.app.tr(u".\example_imgs"), self.app.tr("Images (*.jpg)"))
@@ -199,11 +243,15 @@ class Application:
         self.fill_table()
         self.updete_viewers()
 
-    def fill_table(self):
 
+    def fill_table(self):
+        data = []
         sample = self.project.current_sample
 
-        data=[]
+        if not sample:
+            data = [['', '', '']]
+            self.mainDialog.tablemodel.setData(data)
+            return
 
         for track in sample.tracks.get_sorted():
             data.append([str(track.id),str(track.count),str(track.area)])
@@ -230,6 +278,9 @@ class Application:
 
     def updete_viewers(self):
         sample = self.project.current_sample
+
+        if not sample:
+            return
 
         self.mainDialog.ThroughArea.load_image(sample.through)
         self.mainDialog.BacklightArea.load_image(sample.backlight)
