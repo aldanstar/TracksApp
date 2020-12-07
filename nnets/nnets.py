@@ -23,7 +23,7 @@ class counter:
 
     def predict(self, orig_imgs):
         to_pred=[]
-        for img in orig_imgs:
+        for i,img in enumerate(orig_imgs):
             img = (img / 127) - 1
             to_pred.append(img)
         prediction = self.model.predict(to_pred)

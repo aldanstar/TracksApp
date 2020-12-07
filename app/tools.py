@@ -48,27 +48,50 @@ class tools: #набор статических функций для расче
         img3 = cv2.equalizeHist(img3)
         return tools.normalize(img3)
 
+
+
     @staticmethod
-    def processing(path_to_file, project, separator_net, segmentation_net, counter_net):
+    def processing(path_to_file, project, separator_net, segmentation_net, counter_net, callback=None):
         '''Процедура обработки изображений'''
+
+        steps = ['Ищем похожие файлы','Определение типа изображений',
+                'Конвертация в RGB','Определение наименования образца',
+                'Семантическая сегментация подгтовленного изображения','Подсчет треков в кластерах']
+        step = 0.
+
+        def update_status(step, substep = 1):
+            if callback:
+                step += 1.*substep
+                callback(step, steps)
+
+            return step
+
         # Ищем похожие файлы
         files=tools.findSame(path_to_file)
+        step = update_status(step)
 
         # Определение типа изображений
         backlight_path, through_path = separator_net.predict(files)
+        step = update_status(step)
 
+        # Конвертация в RGB
         through = tools.rgb_read(through_path)
         backlight = tools.rgb_read(backlight_path)
+        step = update_status(step)
 
         # Поиск общей части из названий изображений для наименования образца в проекте
         name = tools.commonString(os.path.basename(files[0]),os.path.basename(files[1]))
+        step = update_status(step)
 
         if name not in project.get_samples_names():
+
             project.samples.add_item(name,through,backlight)
             # Семантическая сегментация подгтовленного изображения
             tools.semantic_segmentation(project, segmentation_net)
+            step = update_status(step)
+
             # Подсчет треков в кластерах
-            tools.counter(project, counter_net)
+            tools.counter(project, counter_net, update_status, step)
 
     @staticmethod
     def findSame(path):
@@ -160,7 +183,7 @@ class tools: #набор статических функций для расче
         return x1, x2, y1, y2, frame, copy, elements
 
     @staticmethod
-    def semantic_segmentation(project, segmentation):
+    def semantic_segmentation(project, segmentation, callback=None, step=None):
         '''Семантическая сегментация подгтовленного изображения'''
         sample = project.current_sample
 
@@ -177,12 +200,16 @@ class tools: #набор статических функций для расче
             area = round((float(elements)/size)*100, 2)
             sample.tracks.add_item(left, rigth, top, bottom, frame, contour, area)
 
+            substep = (i+1.)/float(len(contours))
+            if callback: callback(step, substep)
+
     @staticmethod
-    def counter(project, nnet):
+    def counter(project, nnet, callback=None, step=None):
         '''Посдсчет треков на изображении и заполнение проекта'''
         sample = project.current_sample
+        tracks = sample.tracks.get_sorted_by_id()
 
-        for track in sample.tracks.get_sorted_by_id():
+        for i,track in enumerate(tracks):
 
             frame = cv2.resize(track.frame, (416, 416))*255
             frame = frame[...,None][None,...]
@@ -199,3 +226,5 @@ class tools: #набор статических функций для расче
             if prediction==0: prediction=1
 
             track.count = np.uint8(prediction)
+            substep = (i+1.)/float(len(tracks))
+            if callback: callback(step, substep)

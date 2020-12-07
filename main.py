@@ -5,25 +5,27 @@
 import sys, os
 import numpy as np
 import pickle
+from math import ceil
 
-from PySide2.QtWidgets import QApplication, QDesktopWidget, QMainWindow, QTabWidget, QDockWidget, QWidget,QLabel
+from PySide2.QtWidgets import QApplication, QDesktopWidget, QMainWindow, QTabWidget, QDockWidget, QWidget,QLabel, QProgressBar
 from PySide2.QtWidgets import QVBoxLayout
 from PySide2.QtWidgets import QFileDialog, QTableView
-from PySide2.QtWidgets import QAction
 from PySide2.QtCore import Qt, QTranslator
+
 
 from nnets import imgsep, imgsemseg, counter
 
-from app import Project,tools, com_port
+from app import Project,tools, com_port, Settings
 
 from gui.gui_structs import menu_item, table_model, menu_bar
 from gui.viewer import ViewerArea
 from gui.status import work_indicator
 from gui.gui_communication import com_port_dialog
 from gui.additional import about_dialog
-from gui.tree import ProjectTreeModel, Node, ProjectTree
+from gui.tree import Node, ProjectTree
 
 class main_dialog(QMainWindow):
+    '''Главное диалоговое окно'''
     def __init__(self, app, title):
         QMainWindow.__init__(self, parent=None)
         self.app = app
@@ -36,10 +38,15 @@ class main_dialog(QMainWindow):
         self.gui_init()
 
     def addStatusObj(self, obj):
-            self.statusBar().addWidget(obj)
+        '''Добовление стркои статуса'''
+        self.statusBar().addWidget(obj)
+
+    def addPermanentStatusObj(self, obj):
+        '''Добовление стркои статуса'''
+        self.statusBar().addPermanentWidget(obj)
 
     def addMenuItem(self, obj):
-            newItem=self.menuBar().addItem(obj)
+        newItem=self.menuBar().addItem(obj)
 
     def addMenuItems(self, *objs):
         for obj in objs:
@@ -127,6 +134,9 @@ class Application:
         self.separator = imgsep()
         self.counter = counter()
 
+        # Настройки
+        self.settings = Settings()
+
     def run(self):
         self.app = QApplication(sys.argv)
         translator = QTranslator(self.app)
@@ -161,6 +171,13 @@ class Application:
         com_indicator=work_indicator(u'COM PORT')
         self.mainDialog.addStatusObj(com_indicator)
 
+        self.progressBar = QProgressBar()
+        self.progressBar.setTextVisible(True)
+        self.progressBar.setAlignment(Qt.AlignCenter)
+        self.progressBar.minimum = 1
+        self.progressBar.maximum = 100
+        self.mainDialog.addPermanentStatusObj(self.progressBar)
+
         treeDock = QDockWidget(self.mainDialog.tr(u'Project tree'), self.mainDialog)
         treeDock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
         self.mainDialog.addDockWidget(Qt.LeftDockWidgetArea, treeDock)
@@ -170,8 +187,15 @@ class Application:
         self.project_tree.doubleClicked.connect(self.on_tree_clicked)
         treeDock.setWidget(self.project_tree)
 
-
         sys.exit(self.app.exec_())
+
+    def setProgress(self, step, steps):
+        value = step/float(len(steps))*100.
+        indx = int(ceil(step-1))
+        text = self.app.tr(steps[indx])
+        self.progressBar.setFormat("{0} - {1}%".format(text,round(value,0)))
+        self.progressBar.setValue(value)
+        self.app.processEvents()
 
     def on_tree_clicked(self, index):
         item = self.project_tree.selectedIndexes()[0]
@@ -189,6 +213,7 @@ class Application:
         self.refresh()
 
     def openProject(self):
+
         fileName, _ = QFileDialog.getOpenFileName(self.mainDialog, self.app.tr("Load project"),  ".\\", self.app.tr("Project file (*.tpr)"))
 
         infile = open(fileName, 'rb')
@@ -229,7 +254,7 @@ class Application:
         # path_to_file, _ = QFileDialog.getOpenFileName(self.mainDialog, self.app.tr("Load Image"), self.app.tr("~/Desktop/"), self.app.tr("Images (*.jpg)"))
 
         # Определяем тип файла на просвет или на подсветку
-        tools.processing(path_to_file, self.project, self.separator, self.segmentation, self.counter)
+        tools.processing(path_to_file, self.project, self.separator, self.segmentation, self.counter, self.setProgress)
         self.refresh()
 
     def refresh(self):

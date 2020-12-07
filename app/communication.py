@@ -82,7 +82,7 @@ class com_port:
                                 break
                             sleep(1)
                     self.closeport(ser)
-                    rule = 'Simple 3-axis fluxgate magnetometer system' in rx2
+                    rule = 'Название прибора' in rx2
                     if rule:
                         print(rx2)
                         self.setCurrent(com)
